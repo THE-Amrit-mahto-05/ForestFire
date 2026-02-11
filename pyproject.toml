@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agni-chakshu"
+version = "0.1.0"
+authors = [
+  { name="Amrit Kumar Mahto" },
+]
+description = "Jharkhand Forest Fire Intelligence System"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "torch",
+    "torchvision",
+    "numpy",
+    "pandas",
+    "geopandas",
+    "rasterio",
+    "rioxarray",
+    "xarray",
+    "scipy",
+    "matplotlib",
+    "opencv-python",
+    "fastapi",
+    "uvicorn",
+    "streamlit",
+    "folium",
+    "streamlit-folium",
+    "pillow",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "web*"]

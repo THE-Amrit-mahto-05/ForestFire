@@ -57,4 +57,8 @@ def run_pipeline():
     print("Pipeline execution complete.")
 
 if __name__ == "__main__":
-    run_pipeline()
+    import sys
+    # Allow running with custom dirs for demo
+    d_dir = sys.argv[1] if len(sys.argv) > 1 else 'data/raw'
+    o_dir = sys.argv[2] if len(sys.argv) > 2 else 'data/processed'
+    run_pipeline(data_dir=d_dir, output_dir=o_dir)

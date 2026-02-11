@@ -4,8 +4,8 @@ from rasterio.transform import from_origin
 import xarray as xr
 import os
 
-def generate_synthetic_data(data_dir='data/raw'):
-    print("🛠 Generating synthetic data for demonstration...")
+def generate_synthetic_data(data_dir='data/demo_raw'):
+    print(f"🛠 Generating synthetic data for demonstration in {data_dir}...")
     os.makedirs(data_dir, exist_ok=True)
 
     dem_path = os.path.join(data_dir, 'dem_90m.tif')
