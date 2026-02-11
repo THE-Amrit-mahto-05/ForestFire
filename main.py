@@ -10,10 +10,11 @@ from src.utils import save_as_geotiff, generate_fire_gif
 def run_pipeline(data_dir='data/raw', output_dir='data/processed'):
     print("Starting Agni-Chakshu Pipeline")
     
-    if not os.path.exists("data/processed/feature_stack.npy"):
-        preprocess_all()
+    feature_stack_path = os.path.join(output_dir, "feature_stack.npy")
+    if not os.path.exists(feature_stack_path):
+        preprocess_all(data_dir=data_dir, output_dir=output_dir)
     else:
-        print("Data already processed. Skipping.")
+        print(f"Data already processed at {output_dir}. Skipping.")
 
     device = get_device()
     print(f"Using device: {device}")
@@ -28,7 +29,7 @@ def run_pipeline(data_dir='data/raw', output_dir='data/processed'):
         print("No trained weights found. Using random initialization for demonstration.")
 
     model.eval()
-    features = np.load("data/processed/feature_stack.npy")
+    features = np.load(os.path.join(output_dir, "feature_stack.npy"))
     input_tensor = torch.from_numpy(features).unsqueeze(0).to(device)
     
     with torch.no_grad():
@@ -39,20 +40,25 @@ def run_pipeline(data_dir='data/raw', output_dir='data/processed'):
     with rasterio.open("data/raw/dem_90m.tif") as src:
         profile = src.profile
     
-    save_as_geotiff(risk_map, profile, "outputs/maps/latest_risk.tif")
-    print("Risk map saved to outputs/maps/latest_risk.tif")
 
-    print("Running fire spread simulation...")
-
-    fuel_map = np.load("data/processed/feature_stack.npy")[2] 
+    risk_map_sim = (risk_map - risk_map.min()) / (risk_map.max() - risk_map.min() + 1e-8)
+    fuel_stack = np.load(os.path.join(output_dir, "feature_stack.npy"))
+    fuel_map = fuel_stack[2] if fuel_stack.ndim == 3 else fuel_stack
     
-    sim = FireSimulation(risk_map, fuel_map, wind_vector=(1, 1))
+    sim = FireSimulation(risk_map_sim, fuel_map, wind_vector=(1, 1))
     h, w = risk_map.shape
     sim.ignite(h//2, w//2)
     
-    frames = sim.run(steps=12)
+    hourly_states = sim.run()
+    
+    from src.utils import colorize_simulation_frame
+    frames = [colorize_simulation_frame(s)[:,:,:3] for s in hourly_states.values()]
     generate_fire_gif(frames, "outputs/animations/fire_spread.gif")
-    print("Simulation GIF saved to outputs/animations/fire_spread.gif")
+    
+    final_state = hourly_states[12]
+    save_as_geotiff(final_state, profile, "outputs/maps/fire_spread_12h.tif")
+    
+    print("Simulation outputs saved.")
 
     print("Pipeline execution complete.")
 

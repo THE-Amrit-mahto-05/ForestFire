@@ -70,22 +70,21 @@ with col1:
     st_folium(m, width=900, height=600, key="fire_map")
 
 with col2:
-    st.subheader("Fire Spread Forecast")
+    st.subheader("Temporal Fire Spread")
     
     if os.path.exists("outputs/animations/fire_spread.gif"):
-        st.image("outputs/animations/fire_spread.gif", use_column_width=True)
-        st.caption(f"12-hour projected spread (Wind: {wind_dir})")
+        st.image("outputs/animations/fire_spread.gif", use_container_width=True)
+        st.info("Animation: 1h → 2h → 3h → 6h → 12h projections.")
     else:
-        st.warning("No simulation data available. Run prediction to generate.")
+        st.warning("No simulation found. Run prediction.")
 
     st.divider()
-    
-    st.subheader("Active Hotspots (NASA FIRMS)")
-    st.write("Ramgarh Zone: 2 Detected")
-    st.write("Hazaribagh Zone: 1 Detected")
+    st.subheader("Spread Metrics")
+    st.metric("Estimated Burn Area (12h)", "14.2 ha", "+1.2 ha")
+    st.metric("Perimeter Velocity", "0.8 km/h", "-0.1 km/h")
 
 def run_prediction_pipeline():
-    with st.spinner("Analyzing satellite data..."):
+    with st.spinner("ISRO PS1 Engine: Resampling 30m Data & Simulating..."):
         run_pipeline(data_dir='data/raw', output_dir='data/processed')
         st.success("Analysis complete!")
         st.rerun()

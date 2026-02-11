@@ -2,12 +2,10 @@ import numpy as np
 from scipy.ndimage import convolve
 
 class FireSimulation:
-    def __init__(self, risk_map, fuel_map, wind_vector=(1, 0)):
+    def __init__(self, risk_map, fuel_map, wind_vector=(1, 1)):
         """
-        Cellular Automata simulation for Fire Spread.
-        risk_map: 2D array of ignition probability (0-1).
-        fuel_map: 2D array of fuel availability (0-1).
-        wind_vector: (dx, dy) direction of wind.
+        Refined Cellular Automata for ISRO PS1.
+        States: 0=Unburnt, 1=Burning, 2=Burnt
         """
         self.risk_map = risk_map
         self.fuel_map = fuel_map
@@ -16,37 +14,44 @@ class FireSimulation:
         self.reset()
 
     def reset(self):
-        """Resets the simulation state (fire mask)."""
-        self.fire_mask = np.zeros((self.height, self.width), dtype=np.float32)
+        self.state = np.zeros((self.height, self.width), dtype=np.uint8)
 
     def ignite(self, y, x):
-        """Manually ignites a point."""
-        self.fire_mask[y, x] = 1.0
+        """Ignites a small cluster around the point for stability."""
+        self.state[max(0, y-1):min(self.height, y+2), max(0, x-1):min(self.width, x+2)] = 1
+
+    def run(self):
+        """Runs the simulation and returns snapshots for 1, 2, 3, 6, 12 hours."""
+        history = {0: self.state.copy()}
+        checkpoints = [1, 2, 3, 6, 12]
+        
+        current_hour = 0
+        while current_hour < 12:
+            current_hour += 1
+            self.step()
+            if current_hour in checkpoints:
+                history[current_hour] = self.state.copy()
+        
+        return history
 
     def step(self):
-        """Executes one iteration of fire spread."""
-        kernel = np.array([
-            [0.1, 0.2, 0.1],
-            [0.2, 1.0, 0.2],
-            [0.1, 0.2, 0.1]
-        ])
+        """Advances simulation by 1 hour using multi-factor probability."""
+        new_state = self.state.copy()
+        is_burning = (self.state == 1)
         
-        neighbor_sum = convolve(self.fire_mask, kernel, mode='constant', cval=0)
+        for dy in [-1, 0, 1]:
+            for dx in [-1, 0, 1]:
+                if dy == 0 and dx == 0: continue
+                shifted = np.roll(np.roll(is_burning, dy, axis=0), dx, axis=1)
+                
+                w_norm = np.linalg.norm(self.wind_vector) + 1e-6
+                wind_eff = np.dot([dx, dy], self.wind_vector) / w_norm
+                
+                spread_prob = self.risk_map * self.fuel_map * (1.0 + 0.6 * wind_eff)
+                
+                ignite = (np.random.rand(self.height, self.width) < spread_prob * 0.7)
+                
+                new_state[(self.state == 0) & shifted & ignite] = 1
         
-        dx, dy = self.wind_vector
-        shifted_neighbors = np.roll(neighbor_sum, shift=(int(dy), int(dx)), axis=(0, 1))
-        
-        spread_chance = shifted_neighbors * self.risk_map * self.fuel_map
-        new_fire = (spread_chance > 0.5).astype(np.float32)
-
-        self.fire_mask = np.clip(self.fire_mask + new_fire, 0, 1)
-        self.fuel_map = np.clip(self.fuel_map - (self.fire_mask * 0.05), 0, 1)
-        
-        return self.fire_mask.copy()
-
-    def run(self, steps=12):
-        """Runs the simulation for N steps and returns frames."""
-        frames = [self.fire_mask.copy()]
-        for _ in range(steps):
-            frames.append(self.step())
-        return frames
+        new_state[is_burning] = 2
+        self.state = new_state
