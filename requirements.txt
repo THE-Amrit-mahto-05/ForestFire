@@ -15,4 +15,3 @@ streamlit
 folium
 streamlit-folium
 pillow
-pickle5
