@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.ndimage import convolve
 
 class FireSimulation:
     def __init__(self, risk_map, fuel_map, wind_vector=(1, 1)):
@@ -17,8 +16,9 @@ class FireSimulation:
         self.state = np.zeros((self.height, self.width), dtype=np.uint8)
 
     def ignite(self, y, x):
-        """Ignites a small cluster around the point for stability."""
-        self.state[max(0, y-1):min(self.height, y+2), max(0, x-1):min(self.width, x+2)] = 1
+        """Ignites a larger cluster for visibility."""
+        r = 3
+        self.state[max(0, y-r):min(self.height, y+r), max(0, x-r):min(self.width, x+r)] = 1
 
     def run(self):
         """Runs the simulation and returns snapshots for 1, 2, 3, 6, 12 hours."""
@@ -35,23 +35,26 @@ class FireSimulation:
         return history
 
     def step(self):
-        """Advances simulation by 1 hour using multi-factor probability."""
+        """Advances simulation by 1 hour. Aggressive spread for demo."""
         new_state = self.state.copy()
         is_burning = (self.state == 1)
         
+        # Check 8-neighbors
         for dy in [-1, 0, 1]:
             for dx in [-1, 0, 1]:
                 if dy == 0 and dx == 0: continue
+                
                 shifted = np.roll(np.roll(is_burning, dy, axis=0), dx, axis=1)
                 
                 w_norm = np.linalg.norm(self.wind_vector) + 1e-6
                 wind_eff = np.dot([dx, dy], self.wind_vector) / w_norm
                 
-                spread_prob = self.risk_map * self.fuel_map * (1.0 + 0.6 * wind_eff)
+                # Boosted spread probability for demo visibility
+                spread_prob = (self.risk_map + self.fuel_map) * (0.8 + 0.4 * wind_eff)
                 
-                ignite = (np.random.rand(self.height, self.width) < spread_prob * 0.7)
-                
-                new_state[(self.state == 0) & shifted & ignite] = 1
+                ignite_mask = (np.random.rand(self.height, self.width) < spread_prob * 0.9)
+                new_state[(self.state == 0) & shifted & ignite_mask] = 1
         
+        # Current burning becomes burnt
         new_state[is_burning] = 2
         self.state = new_state

@@ -12,7 +12,6 @@ import base64
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import run_pipeline
 
-
 st.set_page_config(page_title="Agni-Chakshu | Fire Intelligence", layout="wide")
 
 st.title("Agni-Chakshu")
@@ -56,10 +55,10 @@ with col1:
         folium.raster_layers.ImageOverlay(
             image=f"data:image/png;base64,{png_base64}",
             bounds=img_bounds,
-            opacity=0.7,
+            opacity=0.8,
             interactive=True,
             cross_origin=False,
-            zindex=1,
+            zindex=2,
             name="Fire Risk Heatmap"
         ).add_to(m)
         folium.LayerControl().add_to(m)
