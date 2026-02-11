@@ -8,3 +8,11 @@ rioxarray
 xarray
 scipy
 matplotlib
+opencv-python
+fastapi
+uvicorn
+streamlit
+folium
+streamlit-folium
+pillow
+pickle5

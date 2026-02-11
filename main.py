@@ -1,21 +1,60 @@
+import os
 import torch
 import numpy as np
-from src.model import UNet
+import rasterio
+from src.model import UNet, get_device
+from src.preprocess import preprocess_all
+from src.simulation import FireSimulation
+from src.utils import save_as_geotiff, generate_fire_gif
 
-def predict_fire_risk():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = UNet().to(device)
+def run_pipeline():
+    print("Starting Agni-Chakshu Pipeline")
     
-    features = np.load('data/processed/feature_stack.npy')
+    if not os.path.exists("data/processed/feature_stack.npy"):
+        preprocess_all()
+    else:
+        print("Data already processed. Skipping.")
+
+    device = get_device()
+    print(f"Using device: {device}")
+    
+    model = UNet(in_channels=5).to(device)
+    model_path = "models/unet_fire_model.pth"
+    
+    if os.path.exists(model_path):
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        print("Loaded trained model weights.")
+    else:
+        print("No trained weights found. Using random initialization for demonstration.")
+
+    model.eval()
+    features = np.load("data/processed/feature_stack.npy")
     input_tensor = torch.from_numpy(features).unsqueeze(0).to(device)
     
-    model.eval()
     with torch.no_grad():
         prediction = model(input_tensor)
     
     risk_map = prediction.squeeze().cpu().numpy()
-    np.save('outputs/maps/latest_risk.npy', risk_map)
-    print("Prediction complete. Map saved in outputs/maps/")
+    
+    with rasterio.open("data/raw/dem_90m.tif") as src:
+        profile = src.profile
+    
+    save_as_geotiff(risk_map, profile, "outputs/maps/latest_risk.tif")
+    print("Risk map saved to outputs/maps/latest_risk.tif")
+
+    print("Running fire spread simulation...")
+
+    fuel_map = np.load("data/processed/feature_stack.npy")[2] 
+    
+    sim = FireSimulation(risk_map, fuel_map, wind_vector=(1, 1))
+    h, w = risk_map.shape
+    sim.ignite(h//2, w//2)
+    
+    frames = sim.run(steps=12)
+    generate_fire_gif(frames, "outputs/animations/fire_spread.gif")
+    print("Simulation GIF saved to outputs/animations/fire_spread.gif")
+
+    print("Pipeline execution complete.")
 
 if __name__ == "__main__":
-    predict_fire_risk()
+    run_pipeline()

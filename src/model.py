@@ -1,33 +1,78 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+class DoubleConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.double_conv(x)
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=1):
+    def __init__(self, in_channels=5, out_channels=1):
+        """
+        U-Net Architecture for Fire Risk Prediction.
+        Channels usually: [Elevation, Slope, Fuel, Road Distance, Weather]
+        """
         super(UNet, self).__init__()
         
-        def double_conv(in_c, out_c):
-            return nn.Sequential(
-                nn.Conv2d(in_c, out_c, kernel_size=3, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_c, out_c, kernel_size=3, padding=1),
-                nn.ReLU(inplace=True)
-            )
-
-        self.down1 = double_conv(in_channels, 64)
-        self.down2 = double_conv(64, 128)
-        self.pool = nn.MaxPool2d(2)
+        self.inc = DoubleConv(in_channels, 64)
+        self.down1 = nn.Sequential(nn.MaxPool2d(2), DoubleConv(64, 128))
+        self.down2 = nn.Sequential(nn.MaxPool2d(2), DoubleConv(128, 256))
+        self.down3 = nn.Sequential(nn.MaxPool2d(2), DoubleConv(256, 512))
         
-        self.up = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.conv_last = nn.Conv2d(128, out_channels, kernel_size=1)
+        self.up1 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.conv_up1 = DoubleConv(512, 256)
+        
+        self.up2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.conv_up2 = DoubleConv(256, 128)
+        
+        self.up3 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        self.conv_up3 = DoubleConv(128, 64)
+        
+        self.outc = nn.Conv2d(64, out_channels, kernel_size=1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        c1 = self.down1(x)
-        p1 = self.pool(c1)
-        c2 = self.down2(p1)
-        u1 = self.up(c2)
-        if u1.shape != c1.shape:
-            u1 = torch.nn.functional.interpolate(u1, size=c1.shape[2:])
-        merge = torch.cat([u1, c1], dim=1)
-        out = self.conv_last(merge)
-        return self.sigmoid(out)
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        u1 = self.up1(x4)
+        if u1.shape != x3.shape:
+            u1 = F.interpolate(u1, size=x3.shape[2:], mode='bilinear', align_corners=True)
+        u1 = torch.cat([u1, x3], dim=1)
+        u1 = self.conv_up1(u1)
+        
+        u2 = self.up2(u1)
+        if u2.shape != x2.shape:
+            u2 = F.interpolate(u2, size=x2.shape[2:], mode='bilinear', align_corners=True)
+        u2 = torch.cat([u2, x2], dim=1)
+        u2 = self.conv_up2(u2)
+        
+        u3 = self.up3(u2)
+        if u3.shape != x1.shape:
+            u3 = F.interpolate(u3, size=x1.shape[2:], mode='bilinear', align_corners=True)
+        u3 = torch.cat([u3, x1], dim=1)
+        u3 = self.conv_up3(u3)
+        
+        logits = self.outc(u3)
+        return self.sigmoid(logits)
+
+def get_device():
+    """Returns MPS if available (Mac M-series), CUDA, or CPU."""
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    elif torch.cuda.is_available():
+        return torch.device("cuda")
+    else:
+        return torch.device("cpu")
