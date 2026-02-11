@@ -1,60 +1,96 @@
 import numpy as np
 
 class FireSimulation:
-    def __init__(self, risk_map, fuel_map, wind_vector=(1, 1)):
+    def __init__(self, risk_map, fuel_map, wind_vector=(1, 1), slope_map=None):
         """
-        Refined Cellular Automata for ISRO PS1.
-        States: 0=Unburnt, 1=Burning, 2=Burnt
+        Advanced Cellular Automata for Dynamic Fire Spread.
+        intensity: 0.0=Unburnt, 0.1-0.3=Cooling/Charcoal, 0.4-0.7=Active, 0.8-1.0=Peak
         """
         self.risk_map = risk_map
-        self.fuel_map = fuel_map
+        self.fuel_map = fuel_map.copy()
+        self.slope_map = slope_map if slope_map is not None else np.zeros_like(risk_map)
         self.wind_vector = np.array(wind_vector)
         self.height, self.width = risk_map.shape
         self.reset()
 
     def reset(self):
-        self.state = np.zeros((self.height, self.width), dtype=np.uint8)
+        self.intensity = np.zeros((self.height, self.width), dtype=np.float32)
+        self.fuel_remaining = np.ones((self.height, self.width), dtype=np.float32)
+        self.age = np.zeros((self.height, self.width), dtype=np.float32)
 
-    def ignite(self, y, x):
-        """Ignites a larger cluster for visibility."""
-        r = 3
-        self.state[max(0, y-r):min(self.height, y+r), max(0, x-r):min(self.width, x+r)] = 1
+    def ignite(self, y, x, radius=2):
+        """Ignites a starting area."""
+        y_min, y_max = max(0, y-radius), min(self.height, y+radius)
+        x_min, x_max = max(0, x-radius), min(self.width, x+radius)
+        self.intensity[y_min:y_max, x_min:x_max] = 0.8
+        self.age[y_min:y_max, x_min:x_max] = 0.1
 
-    def run(self):
-        """Runs the simulation and returns snapshots for 1, 2, 3, 6, 12 hours."""
-        history = {0: self.state.copy()}
-        checkpoints = [1, 2, 3, 6, 12]
+    def run_with_snapshots(self, hours=[1, 2, 3, 6, 12], steps_per_hour=4):
+        """Runs simulation and returns specific temporal snapshots."""
+        snapshots = {}
+        total_steps = max(hours) * steps_per_hour
+        dt = 1.0 / steps_per_hour
         
-        current_hour = 0
-        while current_hour < 12:
-            current_hour += 1
-            self.step()
-            if current_hour in checkpoints:
-                history[current_hour] = self.state.copy()
-        
-        return history
+        current_step = 0
+        for h in sorted(hours):
+            target_step = h * steps_per_hour
+            while current_step < target_step:
+                self.step(dt=dt)
+                current_step += 1
+            snapshots[h] = self.intensity.copy()
+            
+        return snapshots
 
-    def step(self):
-        """Advances simulation by 1 hour. Aggressive spread for demo."""
-        new_state = self.state.copy()
-        is_burning = (self.state == 1)
+    def step(self, dt=0.25):
+        """Advances simulation by dt hours with multi-stage physics."""
+        new_intensity = self.intensity.copy()
         
-        # Check 8-neighbors
-        for dy in [-1, 0, 1]:
-            for dx in [-1, 0, 1]:
-                if dy == 0 and dx == 0: continue
-                
-                shifted = np.roll(np.roll(is_burning, dy, axis=0), dx, axis=1)
-                
-                w_norm = np.linalg.norm(self.wind_vector) + 1e-6
-                wind_eff = np.dot([dx, dy], self.wind_vector) / w_norm
-                
-                # Boosted spread probability for demo visibility
-                spread_prob = (self.risk_map + self.fuel_map) * (0.8 + 0.4 * wind_eff)
-                
-                ignite_mask = (np.random.rand(self.height, self.width) < spread_prob * 0.9)
-                new_state[(self.state == 0) & shifted & ignite_mask] = 1
+        # 1. Spread Logic
+        burning_mask = self.intensity > 0.4
+        active_y, active_x = np.where(burning_mask)
         
-        # Current burning becomes burnt
-        new_state[is_burning] = 2
-        self.state = new_state
+        for y, x in zip(active_y, active_x):
+            heat = self.intensity[y, x]
+            for dy in [-1, 0, 1]:
+                for dx in [-1, 0, 1]:
+                    if dy == 0 and dx == 0: continue
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < self.height and 0 <= nx < self.width:
+                        # Only spread if target has fuel and isn't already burning hard
+                        if self.fuel_remaining[ny, nx] > 0.1 and self.intensity[ny, nx] < 0.4:
+                            # Factors: Wind + Slope
+                            # High speed should increase probability significantly in wind direction
+                            wind_eff = np.dot([dx, dy], self.wind_vector)
+                            slope_eff = (self.slope_map[ny, nx] - self.slope_map[y, x]) / 5.0 # Upward spread is faster
+                            
+                            prob = (heat * self.risk_map[ny, nx] * self.fuel_map[ny, nx]) 
+                            prob *= (1.0 + 0.5 * wind_eff + 0.3 * slope_eff)
+                            
+                            if np.random.rand() < prob * dt * 3.0:
+                                new_intensity[ny, nx] = max(new_intensity[ny, nx], 0.5)
+
+        # 2. Life Cycle & Consumption
+        # Increment age for burning cells
+        self.age[self.intensity > 0.1] += dt
+        
+        # Heat consumes fuel
+        consumption = self.intensity * 0.3 * dt
+        self.fuel_remaining = np.clip(self.fuel_remaining - consumption, 0, 1)
+        
+        # Intensity evolves: Peak -> Cooling -> Charcoal -> Out
+        # active cells (>0.4)
+        peak_mask = (self.intensity >= 0.4) & (self.fuel_remaining > 0.2)
+        cooling_mask = (self.intensity > 0.1) & (self.fuel_remaining <= 0.2)
+        charcoal_mask = (self.intensity > 0.0) & (self.fuel_remaining <= 0.05)
+
+        # Increase intensity if fuel is plenty
+        new_intensity[peak_mask] = np.clip(new_intensity[peak_mask] + 0.1 * dt, 0.4, 1.0)
+        # Drop intensity as fuel runs out (cooling phase)
+        new_intensity[cooling_mask] = np.clip(new_intensity[cooling_mask] - 0.4 * dt, 0.1, 0.4)
+        # Final charcoal phase
+        new_intensity[charcoal_mask] = np.clip(new_intensity[charcoal_mask] - 0.2 * dt, 0.0, 0.2)
+        
+        # 3. Global update
+        self.intensity = new_intensity
+        self.intensity[self.fuel_remaining < 0.01] = np.clip(self.intensity[self.fuel_remaining < 0.01], 0, 0.1) # charcoal footprint
+
