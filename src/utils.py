@@ -2,6 +2,7 @@ import numpy as np
 import rasterio
 from rasterio.transform import from_origin
 import cv2
+from PIL import Image
 
 def save_as_geotiff(data, profile, output_path):
     """Saves a numpy array as a GeoTIFF using the reference profile."""

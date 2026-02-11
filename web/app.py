@@ -4,8 +4,14 @@ from streamlit_folium import st_folium
 import numpy as np
 import rasterio
 import os
+import sys
 from PIL import Image
 import base64
+
+# Add the project root to sys.path to allow imports from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from main import run_pipeline
+
 
 st.set_page_config(page_title="Agni-Chakshu | Fire Intelligence", layout="wide")
 
@@ -78,8 +84,11 @@ with col2:
     st.write("Ramgarh Zone: 2 Detected")
     st.write("Hazaribagh Zone: 1 Detected")
 
-if trigger_prediction:
-    with st.spinner("Analyzing Geospatial Data..."):
-        os.system("python main.py")
-        st.success("Analysis Complete!")
+def run_prediction_pipeline():
+    with st.spinner("Analyzing satellite data..."):
+        run_pipeline(data_dir='data/raw', output_dir='data/processed')
+        st.success("Analysis complete!")
         st.rerun()
+
+if trigger_prediction:
+    run_prediction_pipeline()
