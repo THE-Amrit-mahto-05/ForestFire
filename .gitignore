@@ -1,10 +1,11 @@
-data/raw/
-
-data/processed/
-
-*.shp
+data/raw/          
+data/processed/    
+*.shp              
 *.dbf
 *.shx
 *.cpg
 *.prj
-
+venv/              
+__pycache__/       
+*.pyc
+.ipynb_checkpoints/ 
