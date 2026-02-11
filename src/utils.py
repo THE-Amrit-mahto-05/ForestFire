@@ -31,7 +31,21 @@ def normalize(array):
     return (array - array.min()) / (array.max() - array.min() + 1e-8)
 
 def colorize_risk_map(risk_map):
-    """Converts a 0-1 probability map into an RGB heatmap."""
+    """Converts a 0-1 probability map into an RGBA heatmap."""
+
     heatmap = (risk_map * 255).astype(np.uint8)
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    return cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
+    colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
+    
+    alpha = np.where(risk_map < 0.1, 0, 180).astype(np.uint8)
+    colored[:, :, 3] = alpha
+    return colored
+
+def array_to_png_base64(array):
+    """Encodes an RGBA array to a base64 PNG string."""
+    from io import BytesIO
+    import base64
+    img = Image.fromarray(array)
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()

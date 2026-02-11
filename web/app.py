@@ -33,16 +33,35 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.subheader("Predictive Risk Map")
     
-    m = folium.Map(location=[23.63, 85.51], zoom_start=11, tiles="CartoDB positron")
+    # Centers on Jharkhand
+    m = folium.Map(location=[23.61, 85.27], zoom_start=9, tiles="CartoDB dark_matter")
     
     if os.path.exists("outputs/maps/latest_risk.tif"):
         with rasterio.open("outputs/maps/latest_risk.tif") as src:
             bounds = src.bounds
-            img_bounds = [[bounds.bottom, bounds.left], [bounds.top, bounds.right]]
-
-            st.info("Risk map overlay active.")
+            data = src.read(1)
+            profile = src.profile
+        
+        from src.utils import colorize_risk_map, array_to_png_base64
+        colored_data = colorize_risk_map(data)
+        png_base64 = array_to_png_base64(colored_data)
+        
+        img_bounds = [[bounds.bottom, bounds.left], [bounds.top, bounds.right]]
+        folium.raster_layers.ImageOverlay(
+            image=f"data:image/png;base64,{png_base64}",
+            bounds=img_bounds,
+            opacity=0.7,
+            interactive=True,
+            cross_origin=False,
+            zindex=1,
+            name="Fire Risk Heatmap"
+        ).add_to(m)
+        folium.LayerControl().add_to(m)
+        st.success("🔥 Latest risk heatmap overlayed.")
+    else:
+        st.info("No risk map found. Run prediction to generate.")
     
-    st_folium(m, width=900, height=600)
+    st_folium(m, width=900, height=600, key="fire_map")
 
 with col2:
     st.subheader("Fire Spread Forecast")

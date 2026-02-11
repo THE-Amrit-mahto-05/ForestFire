@@ -7,7 +7,7 @@ from src.preprocess import preprocess_all
 from src.simulation import FireSimulation
 from src.utils import save_as_geotiff, generate_fire_gif
 
-def run_pipeline():
+def run_pipeline(data_dir='data/raw', output_dir='data/processed'):
     print("Starting Agni-Chakshu Pipeline")
     
     if not os.path.exists("data/processed/feature_stack.npy"):
@@ -58,7 +58,6 @@ def run_pipeline():
 
 if __name__ == "__main__":
     import sys
-    # Allow running with custom dirs for demo
     d_dir = sys.argv[1] if len(sys.argv) > 1 else 'data/raw'
     o_dir = sys.argv[2] if len(sys.argv) > 2 else 'data/processed'
     run_pipeline(data_dir=d_dir, output_dir=o_dir)
