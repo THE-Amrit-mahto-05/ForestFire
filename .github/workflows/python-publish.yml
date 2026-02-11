@@ -35,7 +35,7 @@ jobs:
       - name: Generate dummy data for notebooks
         run: |
           mkdir -p data/processed
-          python -c "import numpy as np; np.save('data/processed/feature_stack.npy', np.random.rand(5, 100, 100).astype(np.float32)); np.save('data/processed/labels.npy', np.random.rand(100, 100).astype(np.float32))"
+          python -c "import numpy as np; np.save('data/processed/feature_stack.npy', np.random.rand(3, 256, 256).astype(np.float32)); np.save('data/processed/labels.npy', np.random.rand(256, 256).astype(np.float32))"
 
       - name: Execute Data Exploration Notebook
         run: |
