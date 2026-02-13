@@ -3,9 +3,9 @@ toolbarMode = "minimal"
 showErrorDetails = false
 
 [theme]
-base = "dark"
-primaryColor = "#ff4b4b"
-backgroundColor = "#000000"
-secondaryBackgroundColor = "#020202"
-textColor = "#ffffff"
+base = "light"
+primaryColor = "#1d4ed8"
+backgroundColor = "#f8faff"
+secondaryBackgroundColor = "#eff6ff"
+textColor = "#1e293b"
 font = "sans serif"

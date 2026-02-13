@@ -33,10 +33,10 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Full Page Blackout */
-    .stApp { background-color: #000000 !important; }
-    .main { background-color: #000000 !important; }
-    [data-testid="stSidebar"] { background-color: #020202 !important; border-right: 1px solid #1a1a1a !important; }
+    /* Full Page Light Theme */
+    .stApp { background-color: #f8faff !important; }
+    .main { background-color: #f8faff !important; }
+    [data-testid="stSidebar"] { background-color: #eff6ff !important; border-right: 1px solid #e2e8f0 !important; }
     
     /* Aggressive Hide for Streamlit Header & Toolbar */
     header, [data-testid="stHeader"] {
@@ -61,35 +61,47 @@ st.markdown("""
         padding-top: 0rem !important;
     }
     
-    /* Metric Cards: Deep Dark on Black */
+    /* Metric Cards: Light Blue on White */
     [data-testid="stMetric"] { 
-        background-color: #080808 !important; 
+        background-color: #ffffff !important; 
         padding: 15px !important; 
         border-radius: 12px !important; 
-        border: 1px solid #1a1a1a !important;
-        border-left: 5px solid #ff4b4b !important; 
+        border: 1px solid #e2e8f0 !important;
+        border-left: 5px solid #1d4ed8 !important; 
         margin-bottom: 5px !important; 
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
     }
     
     /* Global Typography */
-    h1 { color: #ff4b4b !important; font-family: 'Outfit', sans-serif; font-weight: 800 !important; letter-spacing: -1px; }
-    h3, h4 { color: #aaaaaa !important; font-family: 'Courier New', monospace; }
-    label { color: #cccccc !important; font-weight: 600 !important; }
+    h1 { color: #1d4ed8 !important; font-family: 'Outfit', sans-serif; font-weight: 800 !important; letter-spacing: -1px; }
+    h3, h4 { color: #64748b !important; font-family: 'Courier New', monospace; }
+    label { color: #334155 !important; font-weight: 600 !important; }
     
     /* Buttons */
     .stButton>button { 
         width: 100%; 
         border-radius: 10px; 
-        background-color: #ff4b4b; 
+        background-color: #1d4ed8; 
         color: white; 
         font-weight: bold; 
         border: none;
+        transition: all 0.2s ease-in-out;
+    }
+    .stButton>button:hover {
+        background-color: #1e40af !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 10px 15px -3px rgba(29, 78, 216, 0.2) !important;
+        transform: translateY(-1px);
+    }
+    .stButton>button:active {
+        transform: translateY(0px);
     }
 
     /* Telemetry Scales */
-    .scale-bg { width: 100%; background: #111111; height: 6px; border-radius: 3px; position: relative; overflow: hidden; margin-top: 2px; }
+    .scale-bg { width: 100%; background: #e2e8f0; height: 6px; border-radius: 3px; position: relative; overflow: hidden; margin-top: 2px; }
     .scale-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
-    .scale-text { font-size: 11px; color: #777; margin-top: 1px; text-align: right; font-family: 'Courier New', monospace; }
+    .scale-text { font-size: 11px; color: #94a3b8; margin-top: 1px; text-align: right; font-family: 'Courier New', monospace; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,11 +117,11 @@ if 'sim_playing' not in st.session_state:
 selected_hour = hours[st.session_state.current_hour_idx]
 
 with st.sidebar:
-    st.image("https://img.icons8.com/wired/64/ff4b4b/fire-extinguisher.png", width=60)
+    st.image("https://img.icons8.com/wired/64/1d4ed8/fire-extinguisher.png", width=60)
     st.header("Risk Engine Controls")
     wind_speed = st.slider("Wind Intensity (km/h)", 0, 50, 15)
     wind_dir = st.selectbox("Wind Vector", ["North", "East", "South", "West", "NE", "NW", "SE", "SW"])
-    trigger_prediction = st.button("🚀 INITIATE PREDICTIVE ANALYSIS")
+    trigger_prediction = st.button("INITIATE PREDICTIVE ANALYSIS")
     
     st.divider()
     st.header("Geospatial Analysts")
@@ -127,19 +139,19 @@ m1, m2, m3 = st.columns(3)
 with m1:
     st.metric("Total Burn Area", f"{cur_area:.1f} ha")
     a_perc = min(100, (cur_area / 60.0) * 100)
-    st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{a_perc}%; background:#ffffff; box-shadow:0 0 10px #fff;"></div></div><p class="scale-text">Cap: 60 ha</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{a_perc}%; background:#1d4ed8; box-shadow:0 0 10px rgba(29, 78, 216, 0.3);"></div></div><p class="scale-text">Cap: 60 ha</p>', unsafe_allow_html=True)
 with m2:
     st.metric("Hourly Expansion", f"+{growth:.2f} ha", delta_color="inverse")
     g_perc = min(100, (growth / 8.0) * 100)
-    st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{g_perc}%; background:#ffffff; box-shadow:0 0 10px #fff;"></div></div><p class="scale-text">Max: 8 ha/h</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{g_perc}%; background:#2563eb; box-shadow:0 0 10px rgba(37, 99, 235, 0.3);"></div></div><p class="scale-text">Max: 8 ha/h</p>', unsafe_allow_html=True)
 with m3:
     st.metric("Boundary Reach", f"{perimeter:.2f} km")
     p_perc = min(100, (perimeter / 12.0) * 100)
-    st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{p_perc}%; background:#ff4b4b; box-shadow:0 0 10px #ff4b4b;"></div></div><p class="scale-text">Limit: 12 km</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{p_perc}%; background:#3b82f6; box-shadow:0 0 10px rgba(59, 130, 246, 0.3);"></div></div><p class="scale-text">Limit: 12 km</p>', unsafe_allow_html=True)
 
 c1, c2, c3 = st.columns([1, 1, 4])
 with c1:
-    play_label = "⏸️ PAUSE" if st.session_state.sim_playing else "▶️ PLAY PROGRESSION"
+    play_label = " PAUSE" if st.session_state.sim_playing else " PLAY PROGRESSION"
     if st.button(play_label):
         st.session_state.sim_playing = not st.session_state.sim_playing
         st.rerun()
@@ -162,15 +174,15 @@ col_map, col_detail = st.columns([2.2, 1])
 with col_map:
     st.subheader(f"📍 Active Fire Operations (T + {selected_hour}h)")
     
-    m = folium.Map(location=[23.61, 85.27], zoom_start=9, tiles="CartoDB dark_matter", attribution_control=False)
+    m = folium.Map(location=[23.61, 85.27], zoom_start=9, tiles="CartoDB positron", attribution_control=False)
     
     legend_html = '''
-    <div style="position: fixed; bottom: 50px; left: 50px; width: 150px; background: rgba(0,0,0,0.8); 
-    z-index:9999; border-radius:10px; padding: 12px; color: white; border: 1px solid #ff4b4b; font-size:12px;">
+    <div style="position: fixed; bottom: 50px; left: 50px; width: 150px; background: rgba(255,255,255,0.9); 
+    z-index:9999; border-radius:10px; padding: 12px; color: #1e293b; border: 1px solid #1d4ed8; font-size:12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
     <b>Intensity</b><br>
-    <i style="background: #ffffff; width:12px; height:12px; display:inline-block; border-radius:2px;"></i> Fire Peak<br>
-    <i style="background: #ff4b4b; width:12px; height:12px; display:inline-block; border-radius:2px;"></i> Active Front<br>
-    <i style="background: #444444; width:12px; height:12px; display:inline-block; border-radius:2px;"></i> Burnt Zone
+    <i style="background: #1d4ed8; width:12px; height:12px; display:inline-block; border-radius:2px;"></i> Fire Peak<br>
+    <i style="background: #3b82f6; width:12px; height:12px; display:inline-block; border-radius:2px;"></i> Active Front<br>
+    <i style="background: #cbd5e1; width:12px; height:12px; display:inline-block; border-radius:2px;"></i> Burnt Zone
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -207,7 +219,7 @@ with col_map:
             colored = colorize_simulation_heatmap(data)
             rgba = np.zeros((*data.shape, 4), dtype=np.uint8)
             rgba[:, :, :3] = colored
-            # NEON ALPHA MASK: High opacity for fire
+
             rgba[data > 0.05, 3] = 255
             rgba[(data > 0.01) & (data <= 0.05), 3] = 200
             folium.raster_layers.ImageOverlay(
@@ -226,7 +238,7 @@ with col_map:
     st_folium(m, width=900, height=600, key="main_map")
 
 with col_detail:
-    st.subheader("📸 Propagation Zoom")
+    st.subheader("Propagation Zoom")
     snap_path = f"outputs/snapshots/fire_{selected_hour}h.png"
     if os.path.exists(snap_path):
         st.image(snap_path, caption=f"Boundary Insight (T+{selected_hour}h)", width="stretch")
