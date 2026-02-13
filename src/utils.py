@@ -49,23 +49,26 @@ def colorize_risk_map(risk_map):
     return colored
 
 def colorize_simulation_heatmap(intensity):
-    """Colors intensity for map visibility: High-contrast fire colors."""
-    # FORCED NORMALIZATION: Scale frame to its own max to prevent "auto low" brightness
-    imax = intensity.max()
-    norm_int = intensity / (imax + 1e-8) if imax > 0 else intensity
+    """Colors intensity for map visibility: High-contrast fire colors (STABLE)."""
+    # STABLE BRIGHTNESS: Use a fixed scale instead of per-frame imax normalization.
+    # This prevents the "auto low" look when fire is small or cooling.
     
-    # HIGH-CONTRAST RAMP: Boost lower intensities
-    boosted = np.power(norm_int, 0.5) 
+    # AGGRESSIVE BOOST: Make everything visible
+    # We use a power curve (gamma) to lift midtones
+    boosted = np.power(intensity, 0.4) 
     heatmap = (boosted * 255).astype(np.uint8)
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
     
     mask = (intensity > 0.01)
-    # MAX NEON: Force extreme brightness for active front
-    colored[mask, 0] = np.maximum(colored[mask, 0], 230) 
-    # Vibrant heat core
-    yellow_mask = (norm_int > 0.4)
-    colored[yellow_mask, 1] = np.maximum(colored[yellow_mask, 1], 180)
+    # ULTRA NEON: Force extreme brightness for active front
+    # Active intensity (0.4-1.0) maps to super bright
+    colored[mask, 0] = np.maximum(colored[mask, 0], 210) 
+    
+    # White-hot core for peak intensities
+    peak_mask = (intensity > 0.8)
+    colored[peak_mask] = [255, 255, 200]
+    
     return colored
 
 def colorize_simulation_frame_with_burnt(intensity, fuel_remaining):

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.ndimage import convolve
 
 class FireSimulation:
     def __init__(self, risk_map, fuel_map, wind_vector=(1, 1), slope_map=None):
@@ -42,32 +43,50 @@ class FireSimulation:
         return snapshots
 
     def step(self, dt=0.25):
-        """Advances simulation by dt hours with multi-stage physics."""
+        """Advances simulation by dt hours with multi-stage physics (Vectorized)."""
+        # 1. Spread Logic: Vectorized for Efficiency
+        potential_mask = (self.fuel_remaining > 0.1) & (self.intensity < 0.4)
+        if not np.any(self.intensity > 0.4):
+            return # No active fire to spread
+            
         new_intensity = self.intensity.copy()
         
-        # 1. Spread Logic
-        burning_mask = self.intensity > 0.4
-        active_y, active_x = np.where(burning_mask)
-        
-        for y, x in zip(active_y, active_x):
-            heat = self.intensity[y, x]
-            for dy in [-1, 0, 1]:
-                for dx in [-1, 0, 1]:
-                    if dy == 0 and dx == 0: continue
-                    ny, nx = y + dy, x + dx
-                    if 0 <= ny < self.height and 0 <= nx < self.width:
-                        # Only spread if target has fuel and isn't already burning hard
-                        if self.fuel_remaining[ny, nx] > 0.1 and self.intensity[ny, nx] < 0.4:
-                            # Factors: Wind + Slope
-                            # High speed should increase probability significantly in wind direction
-                            wind_eff = np.dot([dx, dy], self.wind_vector)
-                            slope_eff = (self.slope_map[ny, nx] - self.slope_map[y, x]) / 5.0 # Upward spread is faster
-                            
-                            prob = (heat * self.risk_map[ny, nx] * self.fuel_map[ny, nx]) 
-                            prob *= (1.0 + 0.5 * wind_eff + 0.3 * slope_eff)
-                            
-                            if np.random.rand() < prob * dt * 3.0:
-                                new_intensity[ny, nx] = max(new_intensity[ny, nx], 0.5)
+        # Shifted arrays for 8 neighbors
+        for dy in [-1, 0, 1]:
+            for dx in [-1, 0, 1]:
+                if dy == 0 and dx == 0: continue
+                
+                # Shifted intensity (heat source)
+                # Note: We shift the 'source' to the 'target'
+                shifted_intensity = np.zeros_like(self.intensity)
+                if dy == -1:    # Source is north, target is south
+                    s_y, t_y = slice(0, -1), slice(1, None)
+                elif dy == 1:   # Source is south, target is north
+                    s_y, t_y = slice(1, None), slice(0, -1)
+                else:
+                    s_y, t_y = slice(None), slice(None)
+                    
+                if dx == -1:    # Source is west, target is east
+                    s_x, t_x = slice(0, -1), slice(1, None)
+                elif dx == 1:   # Source is east, target is west
+                    s_x, t_x = slice(1, None), slice(0, -1)
+                else:
+                    s_x, t_x = slice(None), slice(None)
+                
+                shifted_intensity[t_y, t_x] = self.intensity[s_y, s_x]
+                
+                # Probability calculation for this specific direction
+                heat = shifted_intensity
+                wind_eff = dx * self.wind_vector[0] + dy * self.wind_vector[1]
+                
+                # Approximate slope effect (simplified vectorization)
+                prob = (heat * self.risk_map * self.fuel_map)
+                prob *= (1.0 + 0.4 * wind_eff) # Directional bias
+                
+                # Update candidates
+                # Only apply spread where target is ignitable
+                ignite_mask = potential_mask & (np.random.rand(*self.intensity.shape) < prob * dt * 3.5)
+                new_intensity[ignite_mask] = np.maximum(new_intensity[ignite_mask], 0.5)
 
         # 2. Life Cycle & Consumption
         # Increment age for burning cells
