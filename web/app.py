@@ -27,7 +27,8 @@ from main import run_pipeline
 st.set_page_config(
     page_title="Agni-Chakshu | Command Dashboard", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={}
 )
 
 st.markdown("""
@@ -50,6 +51,14 @@ st.markdown("""
     #MainMenu, footer {
         visibility: hidden !important;
         display: none !important;
+    }
+    /* Critical: Remove top padding that the header usually takes */
+    .stMainBlockContainer {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+    }
+    [data-testid="stAppViewBlockContainer"] {
+        padding-top: 0rem !important;
     }
     
     /* Metric Cards: Deep Dark on Black */
