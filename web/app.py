@@ -69,7 +69,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🔥 AGNI-CHAKSHU")
+st.title("AGNI-CHAKSHU")
 st.markdown("#### Mission Control: Temporospatial Fire Intelligence")
 
 hours = list(range(1, 13))
@@ -113,7 +113,6 @@ with m3:
     p_perc = min(100, (perimeter / 12.0) * 100)
     st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{p_perc}%; background:#ff4b4b; box-shadow:0 0 10px #ff4b4b;"></div></div><p class="scale-text">Limit: 12 km</p>', unsafe_allow_html=True)
 
-# 2. Control Stripe
 c1, c2, c3 = st.columns([1, 1, 4])
 with c1:
     play_label = "⏸️ PAUSE" if st.session_state.sim_playing else "▶️ PLAY PROGRESSION"
@@ -157,7 +156,7 @@ with col_map:
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(colorize_risk_map(src.read(1)))}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.4, zindex=1
+                opacity=0.7, zindex=10 
             ).add_to(m)
 
     if layer_dem and os.path.exists("data/raw/dem_90m.tif"):
@@ -165,7 +164,7 @@ with col_map:
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(colorize_terrain_map(src.read(1)))}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.5, zindex=2
+                opacity=0.8, zindex=5 
             ).add_to(m)
 
     if layer_fuel and os.path.exists("data/processed/fuel_map_90m.tif"):
@@ -173,7 +172,7 @@ with col_map:
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(colorize_fuel_map(src.read(1)))}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.5, zindex=3
+                opacity=0.7, zindex=6 
             ).add_to(m)
 
     spread = f"outputs/maps/fire_spread_{selected_hour}h.tif"
@@ -183,12 +182,12 @@ with col_map:
             colored = colorize_simulation_heatmap(data)
             rgba = np.zeros((*data.shape, 4), dtype=np.uint8)
             rgba[:, :, :3] = colored
-            rgba[data > 0.2, 3] = 255
-            rgba[(data > 0.05) & (data <= 0.2), 3] = 160
+            rgba[data > 0.1, 3] = 255
+            rgba[(data > 0.01) & (data <= 0.1), 3] = 180
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(rgba)}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=1.0, zindex=100
+                opacity=0.95, zindex=100
             ).add_to(m)
 
     center = [23.36, 85.33]
@@ -212,7 +211,6 @@ with col_detail:
     st.metric("Fuel Condition", "Critical", "Dry")
     st.warning("High Risk in Latehar District. Recommended containment: Western Sector.")
 
-# --- Logic & Processing ---
 if trigger_prediction:
     with st.spinner("ISRO Engine: Synthesizing Prediction Layer..."):
         run_pipeline(wind_speed=wind_speed, wind_dir=wind_dir)

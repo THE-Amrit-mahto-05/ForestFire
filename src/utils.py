@@ -43,19 +43,26 @@ def colorize_risk_map(risk_map):
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
     
-    alpha = np.where(risk_map < 0.15, 0, 200).astype(np.uint8)
+    # Transparency: Glowing HUD effect
+    alpha = np.where(risk_map < 0.1, 0, 160).astype(np.uint8) # Slightly more translucent
     colored[:, :, 3] = alpha
     return colored
 
 def colorize_simulation_heatmap(intensity):
     """Colors intensity for map visibility: High-contrast fire colors."""
-    norm_int = (intensity - intensity.min()) / (intensity.max() - intensity.min() + 1e-8)
-    heatmap = (norm_int * 255).astype(np.uint8)
+    # HIGH-CONTRAST RAMP: Boost lower intensities to be visible
+    # We use a power curve to keep the front bright
+    boosted = np.power(intensity, 0.6) 
+    heatmap = (boosted * 255).astype(np.uint8)
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
     
     mask = (intensity > 0.01)
-    colored[mask, 0] = np.maximum(colored[mask, 0], 150) 
+    # NEON CORE: Force a bright core for any active fire
+    colored[mask, 0] = np.maximum(colored[mask, 0], 200) 
+    # Add some yellow to the front for "heat"
+    yellow_mask = (intensity > 0.4)
+    colored[yellow_mask, 1] = np.maximum(colored[yellow_mask, 1], 150)
     return colored
 
 def colorize_simulation_frame_with_burnt(intensity, fuel_remaining):
@@ -118,7 +125,7 @@ def colorize_terrain_map(elevation):
     heatmap = (norm * 255).astype(np.uint8)
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_BONE)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
-    colored[:, :, 3] = 180
+    colored[:, :, 3] = 140 # HUD feel: Translucent but sharp
     return colored
 
 def colorize_fuel_map(fuel_map):
@@ -127,5 +134,5 @@ def colorize_fuel_map(fuel_map):
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_SUMMER)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
     colored[fuel_map == 0, 3] = 0
-    colored[fuel_map > 0, 3] = 160
+    colored[fuel_map > 0, 3] = 130 # HUD feel
     return colored
