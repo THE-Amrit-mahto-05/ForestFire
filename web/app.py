@@ -172,7 +172,7 @@ st.divider()
 col_map, col_detail = st.columns([2.2, 1])
 
 with col_map:
-    st.subheader(f"📍 Active Fire Operations (T + {selected_hour}h)")
+    st.subheader(f"Active Fire Operations (T + {selected_hour}h)")
     
     m = folium.Map(location=[23.61, 85.27], zoom_start=9, tiles="CartoDB positron", attribution_control=False)
     
