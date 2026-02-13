@@ -26,7 +26,7 @@ dependencies = [
     "xarray",
     "scipy",
     "matplotlib",
-    "opencv-python",
+    "opencv-python-headless",
     "fastapi",
     "uvicorn",
     "streamlit>=1.40.0",
