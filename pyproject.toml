@@ -29,7 +29,7 @@ dependencies = [
     "opencv-python",
     "fastapi",
     "uvicorn",
-    "streamlit",
+    "streamlit>=1.40.0",
     "folium",
     "streamlit-folium",
     "pillow",
