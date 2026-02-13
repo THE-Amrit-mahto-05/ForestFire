@@ -37,12 +37,20 @@ st.markdown("""
     .main { background-color: #000000 !important; }
     [data-testid="stSidebar"] { background-color: #020202 !important; border-right: 1px solid #1a1a1a !important; }
     
-    /* Hide Streamlit Header & Toolbar (GitHub, Share, etc) */
-    header { visibility: hidden; height: 0; }
-    .stAppDeployButton { display: none; }
-    [data-testid="stToolbar"] { display: none; }
-    #MainMenu { visibility: hidden; }
-    footer { visibility: hidden; }
+    /* Aggressive Hide for Streamlit Header & Toolbar */
+    header, [data-testid="stHeader"] {
+        display: none !important;
+    }
+    [data-testid="stToolbar"], [data-testid="stToolbarActions"] {
+        display: none !important;
+    }
+    .stAppDeployButton {
+        display: none !important;
+    }
+    #MainMenu, footer {
+        visibility: hidden !important;
+        display: none !important;
+    }
     
     /* Metric Cards: Deep Dark on Black */
     [data-testid="stMetric"] { 
