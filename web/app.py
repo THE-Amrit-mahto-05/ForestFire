@@ -156,7 +156,7 @@ with col_map:
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(colorize_risk_map(src.read(1)))}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.7, zindex=10 
+                opacity=0.6, zindex=10 # HUD feel
             ).add_to(m)
 
     if layer_dem and os.path.exists("data/raw/dem_90m.tif"):
@@ -164,7 +164,7 @@ with col_map:
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(colorize_terrain_map(src.read(1)))}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.8, zindex=5 
+                opacity=0.6, zindex=5 
             ).add_to(m)
 
     if layer_fuel and os.path.exists("data/processed/fuel_map_90m.tif"):
@@ -172,9 +172,10 @@ with col_map:
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(colorize_fuel_map(src.read(1)))}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.7, zindex=6 
+                opacity=0.6, zindex=6 
             ).add_to(m)
 
+    # Simulation Overlay: NEON VISIBILITY
     spread = f"outputs/maps/fire_spread_{selected_hour}h.tif"
     if os.path.exists(spread):
         with rasterio.open(spread) as src:
@@ -182,12 +183,13 @@ with col_map:
             colored = colorize_simulation_heatmap(data)
             rgba = np.zeros((*data.shape, 4), dtype=np.uint8)
             rgba[:, :, :3] = colored
-            rgba[data > 0.1, 3] = 255
-            rgba[(data > 0.01) & (data <= 0.1), 3] = 180
+            # NEON ALPHA MASK: High opacity for fire
+            rgba[data > 0.05, 3] = 255
+            rgba[(data > 0.01) & (data <= 0.05), 3] = 200
             folium.raster_layers.ImageOverlay(
                 image=f"data:image/png;base64,{array_to_png_base64(rgba)}",
                 bounds=[[src.bounds.bottom, src.bounds.left], [src.bounds.top, src.bounds.right]],
-                opacity=0.95, zindex=100
+                opacity=1.0, zindex=100
             ).add_to(m)
 
     center = [23.36, 85.33]
@@ -221,3 +223,30 @@ if st.session_state.sim_playing:
     import time
     time.sleep(1.0)
     st.rerun()
+
+st.markdown("---")
+f_col1, f_col2 = st.columns([2, 1])
+
+with f_col1:
+    st.markdown("###  System Architecture")
+    st.markdown("""
+    **Agni-Chakshu** is a high-fidelity forest fire prediction system. It utilizes satellite-derived 
+    multi-spectral imagery to model fire propagation using cellular automata and deep learning. 
+    By synthesizing topography, fuel loads, and wind vectors, it provides tactical intelligence 
+    for rapid response teams.
+    """)
+    st.markdown("""
+    **Special thanks to:**
+    - **Team Bhuvan**
+    - **National Remote Sensing Centre (NRSC), ISRO**
+    - Hyderabad, INDIA.
+    """)
+
+with f_col2:
+    st.markdown("###  Data Credits")
+    st.markdown("""
+    - **LULC (Land Use Land Cover)** data provided by NRSC/ISRO Bhuvan.
+    - **Fire Hotspots** from NASA FIRMS Team (Fire Information for Resource Management System).
+    - **DEM (Digital Elevation Model)** from OpenTopography for High-Resolution Topography Data.
+    """)
+  
