@@ -234,7 +234,7 @@ with col_map:
     folium.PolyLine([center, [center[0]+v[1]*sc, center[1]+v[0]*sc]], color="#00ff00", weight=5).add_to(m)
     folium.CircleMarker(center, radius=5, color="#00ff00", fill=True).add_to(m)
     
-    st_folium(m, width=900, height=600, key="main_map")
+    st_folium(m, width=900, height=600, key="main_map", returned_objects=[])
 
 with col_detail:
     st.subheader("Propagation Zoom")
