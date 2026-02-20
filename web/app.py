@@ -211,7 +211,6 @@ with col_map:
                 opacity=0.6, zindex=6 
             ).add_to(m)
 
-    # Simulation Overlay: NEON VISIBILITY
     spread = f"outputs/maps/fire_spread_{selected_hour}h.tif"
     if os.path.exists(spread):
         with rasterio.open(spread) as src:
