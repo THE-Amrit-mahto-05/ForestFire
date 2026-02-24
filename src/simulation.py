@@ -75,13 +75,14 @@ class FireSimulation:
                 
                 shifted_intensity[t_y, t_x] = self.intensity[s_y, s_x]
                 
-                # Probability calculation for this specific direction
+                # Heat consumes fuel
                 heat = shifted_intensity
-                wind_eff = dx * self.wind_vector[0] + dy * self.wind_vector[1]
+                # FIX: Invert wind_eff to correctly push fire IN the direction of wind
+                wind_eff = (-dx) * self.wind_vector[0] + (-dy) * self.wind_vector[1]
                 
                 # Approximate slope effect (simplified vectorization)
                 prob = (heat * self.risk_map * self.fuel_map)
-                prob *= (1.0 + 0.4 * wind_eff) # Directional bias
+                prob *= (1.0 + 0.5 * wind_eff) # Boosted directional bias
                 
                 # Update candidates
                 # Only apply spread where target is ignitable

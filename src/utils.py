@@ -43,31 +43,22 @@ def colorize_risk_map(risk_map):
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
     
-    # Transparency: Glowing HUD effect
-    alpha = np.where(risk_map < 0.1, 0, 160).astype(np.uint8) # Slightly more translucent
+    alpha = np.where(risk_map < 0.1, 0, 160).astype(np.uint8) 
     colored[:, :, 3] = alpha
     return colored
 
 def colorize_simulation_heatmap(intensity):
-    """Colors intensity for map visibility: High-contrast fire colors (STABLE)."""
-    # STABLE BRIGHTNESS: Use a fixed scale instead of per-frame imax normalization.
-    # This prevents the "auto low" look when fire is small or cooling.
-    
-    # AGGRESSIVE BOOST: Make everything visible
-    # We use a power curve (gamma) to lift midtones
-    boosted = np.power(intensity, 0.4) 
+    """Colors intensity for map visibility: Balanced contrast fire colors."""
+    # Reduced power boost to keep it from being too bright/washed out
+    boosted = np.power(intensity, 0.6) 
     heatmap = (boosted * 255).astype(np.uint8)
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
     
-    mask = (intensity > 0.01)
-    # ULTRA NEON: Force extreme brightness for active front
-    # Active intensity (0.4-1.0) maps to super bright
-    colored[mask, 0] = np.maximum(colored[mask, 0], 210) 
-    
-    # White-hot core for peak intensities
+    # Balanced masks for better visibility against backgrounds
+    mask = (intensity > 0.1)
     peak_mask = (intensity > 0.8)
-    colored[peak_mask] = [255, 255, 200]
+    colored[peak_mask] = [255, 255, 180] 
     
     return colored
 
@@ -131,7 +122,7 @@ def colorize_terrain_map(elevation):
     heatmap = (norm * 255).astype(np.uint8)
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_BONE)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
-    colored[:, :, 3] = 140 # HUD feel: Translucent but sharp
+    colored[:, :, 3] = 140 
     return colored
 
 def colorize_fuel_map(fuel_map):
@@ -140,5 +131,5 @@ def colorize_fuel_map(fuel_map):
     colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_SUMMER)
     colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGBA)
     colored[fuel_map == 0, 3] = 0
-    colored[fuel_map > 0, 3] = 130 # HUD feel
+    colored[fuel_map > 0, 3] = 130 
     return colored
