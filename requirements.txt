@@ -17,3 +17,5 @@ altair<5.0.0
 folium
 streamlit-folium
 pillow
+python-dotenv
+requests
