@@ -73,6 +73,7 @@ if 'voice_mute' not in st.session_state: st.session_state.voice_mute = False
 if 'voice_audio' not in st.session_state: st.session_state.voice_audio = None
 if 'last_sim_hour' not in st.session_state: st.session_state.last_sim_hour = -1
 if 'countdown' not in st.session_state: st.session_state.countdown = -1
+if 'audio_duration' not in st.session_state: st.session_state.audio_duration = 1.0
 
 def get_secret(key):
     return os.environ.get(key) or (st.secrets.get(key) if hasattr(st, "secrets") else None)
@@ -82,7 +83,7 @@ def get_deepgram_audio(text, hour=0):
     voice = voices[hour % len(voices)]
     api_url = f"https://api.deepgram.com/v1/speak?model={voice}&encoding=linear16&sample_rate=24000"
     api_key = get_secret("DEEPGRAM_API_KEY")
-    if not api_key: return None
+    if not api_key: return None, 1.0
     headers = {"Authorization": f"Token {api_key}", "Content-Type": "application/json"}
     try:
         response = requests.post(api_url, headers=headers, json={"text": text}, timeout=5)
@@ -91,9 +92,10 @@ def get_deepgram_audio(text, hour=0):
                 with wave.open(wav_io, 'wb') as wav_file:
                     wav_file.setnchannels(1); wav_file.setsampwidth(2); wav_file.setframerate(24000)
                     wav_file.writeframes(response.content)
-                return base64.b64encode(wav_io.getvalue()).decode("utf-8")
+                duration = len(response.content) / (24000 * 2)
+                return base64.b64encode(wav_io.getvalue()).decode("utf-8"), duration
     except: pass
-    return None
+    return None, 1.0
 
 def get_narration(hour, area):
     return f"T plus {hour} hours. Total burn area {area:.1f} hectares."
@@ -107,8 +109,12 @@ if st.session_state.sim_playing and not st.session_state.voice_mute:
     if st.session_state.last_sim_hour != selected_hour:
         st.session_state.voice_audio = None
         txt = get_narration(selected_hour, cur_area)
-        audio = get_deepgram_audio(txt, hour=selected_hour)
-        if audio: st.session_state.voice_audio = audio
+        audio, duration = get_deepgram_audio(txt, hour=selected_hour)
+        if audio:
+            st.session_state.voice_audio = audio
+            st.session_state.audio_duration = duration
+        else:
+            st.session_state.audio_duration = 1.0
         st.session_state.last_sim_hour = selected_hour
 
 with st.sidebar:
@@ -223,7 +229,7 @@ if col_detail:
 
 if st.session_state.sim_playing:
     import time
-    time.sleep(1.0)
+    time.sleep(max(0.5, st.session_state.audio_duration))
     st.session_state.current_hour_idx = (st.session_state.current_hour_idx + 1) % len(hours)
     st.rerun()
 
@@ -234,7 +240,10 @@ if "voice_cmd" in st.query_params:
     elif v_cmd == "pause": st.session_state.sim_playing = False
     elif v_cmd == "reset": st.session_state.current_hour_idx = 0; st.session_state.sim_playing = False
     elif v_cmd == "status":
-        txt = get_narration(selected_hour, cur_area); st.session_state.voice_audio = get_deepgram_audio(txt, hour=selected_hour)
+        txt = get_narration(selected_hour, cur_area); audio, duration = get_deepgram_audio(txt, hour=selected_hour)
+        if audio:
+            st.session_state.voice_audio = audio
+            st.session_state.audio_duration = duration
     st.rerun()
 
 components.html("""
