@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
@@ -6,11 +8,6 @@ import rasterio
 import os
 import sys
 from PIL import Image
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
 import base64
 import importlib
 import requests
@@ -19,7 +16,6 @@ import wave
 import io
 import streamlit.components.v1 as components
 
-# Setup paths
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import src.utils
@@ -33,17 +29,13 @@ from src.utils import (
 )
 from main import run_pipeline
 
-# Page Config
 st.set_page_config(page_title="Agni-Chakshu | Command Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-# Styles
 st.markdown("""
 <style>
     .stApp { background-color: #f8faff !important; }
-    /* Ensure the app stays solid during reloads */
     body { background-color: #f8faff !important; }
     [data-testid="stSidebar"] { background-color: #eff6ff !important; border-right: 1px solid #e2e8f0 !important; }
-    /* header, [data-testid="stHeader"], [data-testid="stToolbar"] { display: none !important; } */
     .stMainBlockContainer { padding-top: 0.5rem !important; padding-bottom: 0rem !important; }
     [data-testid="stMetric"] { 
         background-color: #ffffff !important; padding: 15px !important; border-radius: 12px !important; 
@@ -57,41 +49,43 @@ st.markdown("""
     }
     .scale-bg { width: 100%; background: #e2e8f0; height: 6px; border-radius: 3px; margin-top: 2px; }
     .scale-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
-    /* Remove the default Streamlit loading dimming if possible */
     [data-testid="stStatusWidget"] { display: none !important; }
+
+    .countdown-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(15, 23, 42, 0.9);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        z-index: 10000; color: white; transition: all 0.5s ease;
+    }
+    .countdown-timer { font-size: 15rem; font-weight: 900; color: #3b82f6; text-shadow: 0 0 50px rgba(59, 130, 246, 0.5); }
+    .countdown-msg { font-size: 2.5rem; font-weight: 700; margin-top: -2rem; text-transform: uppercase; letter-spacing: 0.2rem; }
+    .vol-msg { font-size: 1.5rem; color: #94a3b8; margin-bottom: 2rem; display: flex; align-items: center; gap: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("AGNI-CHAKSHU")
 st.markdown("#### Mission Control: Temporospatial Fire Intelligence")
 
-# --- SESSION STATE ---
 hours = list(range(1, 13))
 if 'current_hour_idx' not in st.session_state: st.session_state.current_hour_idx = 0
 if 'sim_playing' not in st.session_state: st.session_state.sim_playing = False
 if 'voice_mute' not in st.session_state: st.session_state.voice_mute = False
 if 'voice_audio' not in st.session_state: st.session_state.voice_audio = None
-if 'voice_reply' not in st.session_state: st.session_state.voice_reply = None
 if 'last_sim_hour' not in st.session_state: st.session_state.last_sim_hour = -1
+if 'countdown' not in st.session_state: st.session_state.countdown = -1
 
-# --- UTILS ---
-def query_hf_model(prompt):
-    api_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
-    token = st.secrets.get('HF_TOKEN', os.environ.get('HF_TOKEN', ''))
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
-    payload = {"inputs": f"<s>[INST] You are Agni, an AI Fire Intelligence Officer. {prompt} [/INST]", "parameters": {"max_new_tokens": 80}}
-    try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=5)
-        return response.json()[0]['generated_text'].split("[/INST]")[-1].strip()
-    except: return None
+def get_secret(key):
+    return os.environ.get(key) or (st.secrets.get(key) if hasattr(st, "secrets") else None)
 
-def get_deepgram_audio(text):
-    api_url = "https://api.deepgram.com/v1/speak?model=aura-2-vesta-en&encoding=linear16&sample_rate=24000"
-    api_key = st.secrets.get("DEEPGRAM_API_KEY", os.environ.get("DEEPGRAM_API_KEY", ""))
+def get_deepgram_audio(text, hour=0):
+    voices = ["aura-asteria-en", "aura-luna-en", "aura-stella-en", "aura-hera-en", "aura-vesta-en"]
+    voice = voices[hour % len(voices)]
+    api_url = f"https://api.deepgram.com/v1/speak?model={voice}&encoding=linear16&sample_rate=24000"
+    api_key = get_secret("DEEPGRAM_API_KEY")
     if not api_key: return None
     headers = {"Authorization": f"Token {api_key}", "Content-Type": "application/json"}
     try:
-        response = requests.post(api_url, headers=headers, json={"text": text}, timeout=8)
+        response = requests.post(api_url, headers=headers, json={"text": text}, timeout=5)
         if response.status_code == 200:
             with io.BytesIO() as wav_io:
                 with wave.open(wav_io, 'wb') as wav_file:
@@ -101,75 +95,73 @@ def get_deepgram_audio(text):
     except: pass
     return None
 
-def get_narration(hour, area, growth, perimeter):
-    """Generates a consistent, high-fidelity Mission Control tactical report"""
-    return (
-        f"Mission Update. ... T-plus {hour} hours. ... "
-        f"The total burn area is now {area:.1f} hectares. ... "
-        f"The hourly expansion rate is currently {growth:.2f} hectares. ... "
-        f"The fire boundary spans {perimeter:.2f} kilometers. ... "
-        "Continuing tactical surveillance."
-    )
+def get_narration(hour, area):
+    return f"T plus {hour} hours. Total burn area {area:.1f} hectares."
 
-# --- SHARED STATE & METRICS ---
 selected_hour = hours[st.session_state.current_hour_idx]
 cur_area = 1.2 * (selected_hour ** 1.3)
 growth = cur_area - (1.2 * (max(1, selected_hour - 1) ** 1.3))
 perimeter = 2 * np.pi * np.sqrt(cur_area / np.pi)
 
-# --- AUTO-NARRATION TRIGGER (CRITICAL FOR SYNC) ---
 if st.session_state.sim_playing and not st.session_state.voice_mute:
     if st.session_state.last_sim_hour != selected_hour:
-        # REMOVED st.spinner to prevent brightness flashes
-        txt = get_narration(selected_hour, cur_area, growth, perimeter)
-        audio = get_deepgram_audio(txt)
+        st.session_state.voice_audio = None
+        txt = get_narration(selected_hour, cur_area)
+        audio = get_deepgram_audio(txt, hour=selected_hour)
         if audio: st.session_state.voice_audio = audio
-        else: st.session_state.voice_reply = txt
         st.session_state.last_sim_hour = selected_hour
 
-# --- SIDEBAR ---
 with st.sidebar:
     st.image("https://img.icons8.com/wired/64/1d4ed8/fire-extinguisher.png", width=60)
     st.header("Risk Engine Controls")
-    wind_speed = st.slider("Wind Intensity (km/h)", 0, 50, 15)
+    wind_speed = st.slider("Wind Intensity km/h", 0, 50, 15)
     wind_dir = st.selectbox("Wind Vector", ["North", "East", "South", "West", "NE", "NW", "SE", "SW"])
     if st.button("INITIATE PREDICTIVE ANALYSIS"):
-        with st.spinner("Synthesizing Prediction Layer..."): run_pipeline(wind_speed=wind_speed, wind_dir=wind_dir); st.rerun()
+        with st.spinner("Synthesizing Prediction Layer"): run_pipeline(wind_speed=wind_speed, wind_dir=wind_dir); st.rerun()
     
     st.divider()
     st.header("Geospatial Analysts")
     layer_risk = st.checkbox("AI Fire Risk Layer", value=True)
-    layer_dem = st.checkbox("Terrain Topography (DEM)", value=False)
-    layer_fuel = st.checkbox("Fuel Load (LULC)", value=False)
+    layer_dem = st.checkbox("Terrain Topography DEM", value=False)
+    layer_fuel = st.checkbox("Fuel Load LULC", value=False)
     
     st.divider()
     st.subheader("Mission Communications")
     st.session_state.voice_mute = not st.toggle("Enable Agni Mission Voice", value=not st.session_state.voice_mute)
-    if st.secrets.get("DEEPGRAM_API_KEY", os.environ.get("DEEPGRAM_API_KEY", "")): st.success("**Premium Vesta Active**")
-    else: st.warning("🎙️ **Browser Voice Fallback**")
+    if get_secret("DEEPGRAM_API_KEY"): st.success("Premium Vesta Active")
     
-    # Subtle status indicator instead of st.spinner
     if st.session_state.sim_playing and not st.session_state.voice_mute:
-        st.caption(f"📡 Generating T+{selected_hour}h tactical report...")
+        st.caption(f"Generating T plus {selected_hour}h tactical report")
     
-    # --- VOICE PLAYBACK (Moved to Sidebar to prevent main layout shifts) ---
     if not st.session_state.voice_mute:
         if st.session_state.voice_audio:
             st.audio(base64.b64decode(st.session_state.voice_audio), format="audio/wav", autoplay=True)
             st.session_state.voice_audio = None
-        elif st.session_state.voice_reply:
-            components.html(f"<script>const u=new SpeechSynthesisUtterance({json.dumps(st.session_state.voice_reply)}); u.lang='en-IN'; window.speechSynthesis.speak(u);</script>", height=0)
-            st.session_state.voice_reply = None
     
-    st.info("Commands: 'Play', 'Status', 'Analyze'")
+    st.info("Commands: Play, Status, Analyze")
 
-# --- MAIN UI ---
+if st.session_state.countdown >= 0:
+    st.markdown(f"""
+        <div class="countdown-overlay">
+            <div class="vol-msg">INCREASE DEVICE VOLUME</div>
+            <div class="countdown-timer">{st.session_state.countdown if st.session_state.countdown > 0 else "GO"}</div>
+            <div class="countdown-msg">Starting Tactical Narration</div>
+        </div>
+    """, unsafe_allow_html=True)
+    import time
+    time.sleep(1.0)
+    st.session_state.countdown -= 1
+    if st.session_state.countdown < 0:
+        st.session_state.sim_playing = True
+        st.session_state.last_sim_hour = -1
+    st.rerun()
+
 m1, m2, m3 = st.columns(3)
 with m1:
     st.metric("Total Burn Area", f"{cur_area:.1f} ha")
     st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{min(100, (cur_area/60.0)*100)}%; background:#1d4ed8;"></div></div>', unsafe_allow_html=True)
 with m2:
-    st.metric("Hourly Expansion", f"+{growth:.2f} ha", delta_color="inverse")
+    st.metric("Hourly Expansion", f"+{growth:.2f} ha")
     st.markdown(f'<div class="scale-bg"><div class="scale-fill" style="width:{min(100, (growth/8.0)*100)}%; background:#2563eb;"></div></div>', unsafe_allow_html=True)
 with m3:
     st.metric("Boundary Reach", f"{perimeter:.2f} km")
@@ -177,9 +169,11 @@ with m3:
 
 c1, c2, c3 = st.columns([1, 1, 4])
 with c1:
-    if st.button(" PAUSE" if st.session_state.sim_playing else " PLAY PROGRESSION"):
-        st.session_state.sim_playing = not st.session_state.sim_playing
-        if st.session_state.sim_playing: st.session_state.last_sim_hour = -1 # Reset sync
+    if st.button("PAUSE" if st.session_state.sim_playing else "PLAY PROGRESSION"):
+        if st.session_state.sim_playing:
+            st.session_state.sim_playing = False
+        else:
+            st.session_state.countdown = 3
         st.rerun()
 with c2:
     if st.button("RESET"):
@@ -190,8 +184,6 @@ with c3:
 
 st.divider()
 
-# --- MAP DISPLAY ---
-# Use columns to manage "Two Maps" issue. Only show details when NOT playing to reduce clutter.
 if not st.session_state.sim_playing:
     col_map, col_detail = st.columns([2.2, 1])
 else:
@@ -199,9 +191,7 @@ else:
     col_detail = None
 
 with col_map:
-    st.subheader(f"Active Fire Operations (T + {selected_hour}h)")
-    # CHANGED: Use OpenStreetMap for better contrast/visibility
-    # Create main tactical map
+    st.subheader(f"Active Fire Operations T plus {selected_hour}h")
     m = folium.Map(location=[23.61, 85.27], zoom_start=9, tiles="OpenStreetMap", attribution_control=False)
     
     if layer_risk and os.path.exists("outputs/maps/latest_risk.tif"):
@@ -227,41 +217,36 @@ if col_detail:
     with col_detail:
         st.subheader("Propagation Zoom")
         snap_path = f"outputs/snapshots/fire_{selected_hour}h.png"
-        if os.path.exists(snap_path): st.image(snap_path, caption=f"Boundary Insight (T+{selected_hour}h)", use_container_width=True)
+        if os.path.exists(snap_path): st.image(snap_path, caption=f"Boundary Insight T plus {selected_hour}h", use_container_width=True)
         st.divider()
-        st.metric("Avg Temp", "32°C", "2°C"); st.metric("Fuel Condition", "Critical", "Dry"); st.warning("High Risk in Latehar District.")
+        st.metric("Avg Temp", "32C", "2C"); st.metric("Fuel Condition", "Critical", "Dry"); st.warning("High Risk in Latehar District")
 
-# --- SIM ENGINE LOOP ---
 if st.session_state.sim_playing:
     import time
-    # Reduced wait time for smoother experience, narration handled in sidebar
     time.sleep(1.0)
     st.session_state.current_hour_idx = (st.session_state.current_hour_idx + 1) % len(hours)
     st.rerun()
 
-# --- VOICE COMMAND LOGIC ---
 if "voice_cmd" in st.query_params:
     v_cmd = st.query_params["voice_cmd"]
-    # FIX: Use the new dictionary-like access and clearing for modern Streamlit
     st.query_params.clear() 
     if v_cmd == "play": st.session_state.sim_playing = True; st.session_state.last_sim_hour = -1
     elif v_cmd == "pause": st.session_state.sim_playing = False
     elif v_cmd == "reset": st.session_state.current_hour_idx = 0; st.session_state.sim_playing = False
     elif v_cmd == "status":
-        txt = get_narration(selected_hour, cur_area, growth, perimeter); st.session_state.voice_audio = get_deepgram_audio(txt)
-        if not st.session_state.voice_audio: st.session_state.voice_reply = txt
+        txt = get_narration(selected_hour, cur_area); st.session_state.voice_audio = get_deepgram_audio(txt, hour=selected_hour)
     st.rerun()
 
 components.html("""
 <script>
     const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     rec.continuous = true; 
-    rec.interimResults = true; // Faster response
-    rec.lang = 'en-US'; // Standardized
+    rec.interimResults = true; 
+    rec.lang = 'en-US'; 
     
     rec.onresult = (e) => {
         const results = e.results[e.results.length - 1];
-        if (!results.isFinal) return; // Wait for clear command
+        if (!results.isFinal) return; 
         
         const cmd = results[0].transcript.toLowerCase();
         let action = null;
@@ -273,11 +258,11 @@ components.html("""
         if (action) {
             const url = new URL(window.parent.location.href);
             url.searchParams.set("voice_cmd", action);
-            window.parent.location.replace(url.href); // Slightly cleaner than assignment
+            window.parent.location.replace(url.href); 
         }
     };
     rec.onend = () => { try { rec.start(); } catch(e) {} };
-    rec.onerror = (e) => { console.error("Voice Error:", e.error); };
+    rec.onerror = (e) => { console.error("Voice Error", e.error); };
     try { rec.start(); } catch(e) {}
 </script>
 """, height=0)
